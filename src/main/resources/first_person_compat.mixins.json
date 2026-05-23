@@ -6,7 +6,10 @@
   "refmap": "first_person_compat.refmap.json",
   "mixins": [
     "MixinRenderEngine",
-    "MixinRenderEngineEvents"
+    "MixinRenderEngineEvents",
+    "AccessorHumanoidArmorLayer",
+    "AccessorWearableItemLayer",
+    "AccessorLivingEntityRenderer"
   ],
   "client": [
   ],
