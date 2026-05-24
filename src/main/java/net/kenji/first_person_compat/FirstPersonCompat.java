@@ -35,7 +35,7 @@ import yesman.epicfight.client.mesh.HumanoidMesh;
 public class FirstPersonCompat {
 
     // Define mod id in a common place for everything to reference
-    public static final String MODID = "first_person_compat";
+    public static final String MODID = "epicfight_first_person_model";
 
     public FirstPersonCompat() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();

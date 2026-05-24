@@ -32,7 +32,10 @@ import org.joml.Quaternionf;
 import org.joml.Vector4f;
 import org.lwjgl.glfw.GLFW;
 import yesman.epicfight.api.animation.JointTransform;
+import yesman.epicfight.api.animation.LivingMotion;
+import yesman.epicfight.api.animation.LivingMotions;
 import yesman.epicfight.api.animation.Pose;
+import yesman.epicfight.api.animation.types.StaticAnimation;
 import yesman.epicfight.api.client.forgeevent.PrepareModelEvent;
 import yesman.epicfight.api.client.model.Meshes;
 import yesman.epicfight.api.client.model.SkinnedMesh;
@@ -59,6 +62,8 @@ import java.util.Map;
 
 public class FirstPersonBodyRenderer extends FirstPersonRenderer {
 
+    private float smoothedYaw = 0f;
+    private float prevSmoothedYaw = 0f;
 
     public FirstPersonBodyRenderer(EntityRendererProvider.Context context, EntityType<?> entityType) {
         super(context, entityType);
@@ -87,38 +92,47 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
         poseStack.setIdentity();
 
         if(!(armature instanceof HumanoidArmature humanoidArmature)) return;
+        //====================================
+        //            --ROTATION--
+        //====================================
+        float prevYaw = Mth.wrapDegrees(localPlayerPatch.getYRotO() - entity.yHeadRotO);
+        float currYaw = Mth.wrapDegrees(localPlayerPatch.getYRot() - entity.yHeadRot);
+        float yawForMatrix = Mth.rotLerp(partialTicks, prevYaw, currYaw);
 
+        yawForMatrix = -yawForMatrix;
+        float viewLimit = 50;
+        yawForMatrix = Mth.clamp(yawForMatrix, -viewLimit, viewLimit);
 
-        //HERE-------------------------------------------
-        float yBodyRot = Mth.rotLerp(partialTicks, entity.yBodyRotO, entity.yBodyRot);
-        float yHeadRot = Mth.rotLerp(partialTicks, entity.yHeadRotO, entity.getYRot());
         float xHeadRot = Mth.rotLerp(partialTicks, entity.xRotO, entity.getXRot());
-
-        float yawForMatrix = yHeadRot - yBodyRot;
 
         poseStack.mulPose(Axis.XP.rotationDegrees(xHeadRot));
         poseStack.mulPose(Axis.YP.rotationDegrees(yawForMatrix));
-        //TO-HERE-------------------------------------------
-
-        float standingEyeHeight = entity.getStandingEyeHeight(
-                net.minecraft.world.entity.Pose.STANDING,
-                entity.getDimensions(net.minecraft.world.entity.Pose.STANDING));
-
-        float correction = 0.25F;
-
-        if (entity.isVisuallySwimming()) correction = 0.25F;
-        else if (entity.isFallFlying()) correction = 100.0F;
-
-        //poseStack.translate(0.1F, -standingEyeHeight - 0.05F, correction);
-
+        //-----------------------------------------
+        //--------
         this.prepareVanillaModel(entity, renderer.getModel(), renderer, partialTicks);
         this.setArmaturePose(localPlayerPatch, armature, partialTicks);
+        //--------
 
-        poseStack.translate(-0.1F, 0, correction);
+        //====================================
+        //       TRANSLATION/POSITION
+        //====================================
 
-        OpenMatrix4f chestPoseMatrix = humanoidArmature.getPoseMatrices()[humanoidArmature.chest.getId()];
-        poseStack.translate(-chestPoseMatrix.m30, -chestPoseMatrix.m31 * 1.55, -chestPoseMatrix.m32 * 2.25);
+        float xOffset = 0F;
+        float zOffset = -0.225F;
+        float yOffset = 0.25F;
+        OpenMatrix4f headPoseMatrix = humanoidArmature.getPoseMatrices()[humanoidArmature.head.getId()];
 
+        float headX = headPoseMatrix.m30;
+        float headY = headPoseMatrix.m31;
+        float headZ = headPoseMatrix.m32;
+        float finalMovement = localPlayerPatch.getOriginal().zza + localPlayerPatch.getOriginal().xxa;
+        StaticAnimation walkAnim = localPlayerPatch.getClientAnimator().getLivingMotion(LivingMotions.WALK).get();
+        if(finalMovement == 0 || (walkAnim != null && walkAnim.getPlaySpeed(localPlayerPatch, walkAnim.getAccessor().get()) < 0.05F))
+            xOffset = 0.12F;
+        poseStack.translate(-xOffset, -yOffset, -zOffset);
+        poseStack.translate(-headX, -headY, -headZ);
+
+        //-----------------------------------------
         if (renderType != null) {
             HumanoidMesh mesh = (HumanoidMesh) this.getMeshProvider(localPlayerPatch).get();
             this.prepareModel(mesh, entity, localPlayerPatch, renderer);
@@ -158,15 +172,15 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
 
     @Override
     protected void renderLayer(LivingEntityRenderer<LocalPlayer, PlayerModel<LocalPlayer>> renderer, LocalPlayerPatch entitypatch, LocalPlayer entity, OpenMatrix4f[] poses, MultiBufferSource buffer, PoseStack poseStack, int packedLight, float partialTicks) {
-        List<RenderLayer<LocalPlayer, PlayerModel<LocalPlayer>>> layers = ((AccessorLivingEntityRenderer) renderer).getLayers();
+        Iterator<RenderLayer<LocalPlayer, PlayerModel<LocalPlayer>>> iter = ((AccessorLivingEntityRenderer)renderer).getLayers().iterator();
         float f = MathUtils.lerpBetween(entity.yBodyRotO, entity.yBodyRot, partialTicks);
         float f1 = MathUtils.lerpBetween(entity.yHeadRotO, entity.yHeadRot, partialTicks);
         float f2 = f1 - f;
         float f7 = entity.getViewXRot(partialTicks);
-        float bob = ((MixinLivingEntityRenderer) renderer).invokeGetBob(entity, partialTicks);
+        float bob = ((MixinLivingEntityRenderer)renderer).invokeGetBob(entity, partialTicks);
 
-        Log.info("LayerCount: " + layers.size());
-        for(RenderLayer<LocalPlayer, PlayerModel<LocalPlayer>> layer : layers) {
+        while (iter.hasNext()) {
+            RenderLayer<LocalPlayer, PlayerModel<LocalPlayer>> layer = iter.next();
 
             // Walk up the class hierarchy to find a match in patchedLayers
             Class<?> rendererClass = layer.getClass();
@@ -180,9 +194,11 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
                 lookupClass = lookupClass.getSuperclass();
             }
             if (lookupClass != null && this.patchedLayers.containsKey(lookupClass)) {
-                ((PatchedLayer) this.patchedLayers.get(lookupClass)).renderLayer(
+
+                ((PatchedLayer)this.patchedLayers.get(lookupClass)).renderLayer(
                         entity, entitypatch, layer, poseStack, buffer, packedLight, poses, bob, f2, f7, partialTicks);
             }
+
         }
     }
 
@@ -194,15 +210,8 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
     @Mod.EventBusSubscriber(modid = FirstPersonCompat.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
     public static class ClientEvents{
         @SubscribeEvent
-        public static void onClientTick(TickEvent.ClientTickEvent event){
-            if(event.phase != TickEvent.Phase.END) return;
-
-            LocalPlayer localPlayer = Minecraft.getInstance().player;
-            if(localPlayer == null) return;
-            LocalPlayerPatch localPlayerPatch = EpicFightCapabilities.getLocalPlayerPatch(localPlayer);
-            RenderEngine renderEngine = ClientEngine.getInstance().renderEngine;
-            FirstPersonRenderer renderer = renderEngine.getFirstPersonRenderer();
-           // Log.info("Logging Torso Hidden: " + renderer.getMeshProvider(localPlayerPatch).get().torso.isHidden());
+        public static void onClientTick(TickEvent.ClientTickEvent event) {
+            if (event.phase != TickEvent.Phase.END) return;
         }
         @SubscribeEvent
         public static void onKeyInput(InputEvent.Key event){

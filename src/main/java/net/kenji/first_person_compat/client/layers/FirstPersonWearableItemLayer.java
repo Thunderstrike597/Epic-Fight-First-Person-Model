@@ -37,7 +37,6 @@ public class FirstPersonWearableItemLayer<E extends LivingEntity, T extends Livi
     public void renderLayer(T entitypatch, E entityliving, HumanoidArmorLayer<E, M, M> vanillaLayer,
                             PoseStack poseStack, MultiBufferSource buf, int packedLight, OpenMatrix4f[] poses,
                             float bob, float yRot, float xRot, float partialTicks) {
-        Log.info("FirstPersonWearableItemLayer.renderLayer CALLED");
 
         for(EquipmentSlot slot : EquipmentSlot.values()) {
             if (slot.getType() == EquipmentSlot.Type.ARMOR) {
@@ -141,8 +140,6 @@ public class FirstPersonWearableItemLayer<E extends LivingEntity, T extends Livi
                         }
 
                         poseStack.popPose();
-                        Log.info("Logging First Person Armor!!");
-
                     }
                 }
             }

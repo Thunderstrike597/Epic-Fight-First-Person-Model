@@ -3,7 +3,7 @@
   "minVersion": "0.8",
   "package": "net.kenji.first_person_compat.mixins",
   "compatibilityLevel": "JAVA_8",
-  "refmap": "first_person_compat.refmap.json",
+  "refmap": "epicfight_first_person_model.refmap.json",
   "mixins": [
     "MixinRenderEngine",
     "MixinRenderEngineEvents",
