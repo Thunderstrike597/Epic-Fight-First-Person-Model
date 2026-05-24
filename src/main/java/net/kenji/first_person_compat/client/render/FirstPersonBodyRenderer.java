@@ -62,8 +62,7 @@ import java.util.Map;
 
 public class FirstPersonBodyRenderer extends FirstPersonRenderer {
 
-    private float smoothedYaw = 0f;
-    private float prevSmoothedYaw = 0f;
+    private float offsetTimer = 0f;
 
     public FirstPersonBodyRenderer(EntityRendererProvider.Context context, EntityType<?> entityType) {
         super(context, entityType);
@@ -108,6 +107,7 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
         poseStack.mulPose(Axis.XP.rotationDegrees(xHeadRot));
         poseStack.mulPose(Axis.YP.rotationDegrees(yawForMatrix));
         //-----------------------------------------
+
         //--------
         this.prepareVanillaModel(entity, renderer.getModel(), renderer, partialTicks);
         this.setArmaturePose(localPlayerPatch, armature, partialTicks);
@@ -127,8 +127,17 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
         float headZ = headPoseMatrix.m32;
         float finalMovement = localPlayerPatch.getOriginal().zza + localPlayerPatch.getOriginal().xxa;
         StaticAnimation walkAnim = localPlayerPatch.getClientAnimator().getLivingMotion(LivingMotions.WALK).get();
-        if(finalMovement == 0 || (walkAnim != null && walkAnim.getPlaySpeed(localPlayerPatch, walkAnim.getAccessor().get()) < 0.05F))
-            xOffset = 0.12F;
+        float deltaTime = Minecraft.getInstance().getDeltaFrameTime();
+        float smoothingAmount = 0.7F;
+        float finalOffset = 0.12F;
+        if(finalMovement == 0 || (walkAnim != null && walkAnim.getPlaySpeed(localPlayerPatch, walkAnim.getAccessor().get()) < 0.05F)) {
+            offsetTimer = (float)Math.min(offsetTimer + deltaTime * smoothingAmount, 1.0);
+        }
+        else{
+            offsetTimer = Math.max(offsetTimer - deltaTime * smoothingAmount, 0.0F); // lerp back out
+        }
+        xOffset = Mth.lerp(offsetTimer, 0.0F, finalOffset);
+
         poseStack.translate(-xOffset, -yOffset, -zOffset);
         poseStack.translate(-headX, -headY, -headZ);
 
