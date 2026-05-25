@@ -1,6 +1,6 @@
 ---
 name: Bug
-about: Template for the user to describe the mod issue
+about: Submit An Issue For The Mod!
 title: Mod Issue
 labels: bug
 assignees: ''
