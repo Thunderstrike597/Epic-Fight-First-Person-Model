@@ -7,16 +7,16 @@ assignees: ''
 
 ---
 
-**Are you running the mod's latest version?**:
+Are you running the mod's latest version?:
 
 
 
-**Describe The Issue You Have**:
+Describe The Issue You Have:
 
 
 
-**How do you replicate you issue? (THIS is very important for debugging any issue, so please be as detailed as possible):**
+How do you replicate you issue? (THIS is very important for debugging any issue, so please be as detailed as possible):
 
 
 
-**Additional context(Optional):**
+Additional context(Optional):
