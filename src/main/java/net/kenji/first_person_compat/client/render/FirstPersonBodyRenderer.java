@@ -113,8 +113,8 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
         poseStack.mulPose(Axis.YP.rotationDegrees(-accumulatedYawAtLimit + 180.0F));
 
         float xHeadRot = Mth.rotLerp(partialTicks, entity.xRotO, entity.getXRot());
-        float t = (xHeadRot + 40.0F) / 180.0F;
-        float xForMatrix = Mth.lerp(t, -40.0F, 0.0F);
+        float t = (xHeadRot) / 180.0F;
+        float xForMatrix = Mth.lerp(t, 0, 0.0F);
         poseStack.mulPose(Axis.XP.rotationDegrees(xForMatrix));
 
 
