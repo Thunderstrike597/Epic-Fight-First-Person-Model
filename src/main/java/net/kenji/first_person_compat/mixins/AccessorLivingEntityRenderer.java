@@ -9,8 +9,8 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 import java.util.List;
 
-@Mixin(LivingEntityRenderer.class)
+@Mixin(value = LivingEntityRenderer.class, remap = false)
 public interface AccessorLivingEntityRenderer<T extends LivingEntity, M extends EntityModel<T>> {
-    @Accessor("layers")
+    @Accessor(value = "layers", remap = false)
     List<RenderLayer<T, M>> getLayers();
 }

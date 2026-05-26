@@ -18,6 +18,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EntityType;
 
 import net.minecraft.world.entity.ai.control.BodyRotationControl;
+import net.neoforged.fml.loading.FMLLoader;
 import org.jline.utils.Log;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
@@ -75,51 +76,67 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
         poseStack.setIdentity();
 
         if(!(armature instanceof HumanoidArmature humanoidArmature)) return;
-        //====================================
-        //            --ROTATION--
-        //====================================
-        float headRotRaw = Mth.rotLerp(partialTicks, entity.yHeadRotO, entity.yHeadRot);
-        float headRot = Mth.wrapDegrees(headRotRaw);
-        float bodyRot = Mth.wrapDegrees(Mth.rotLerp(partialTicks, entity.yBodyRotO, entity.yBodyRot));
-        float headBodyDiff = Mth.wrapDegrees(headRot - bodyRot);
+        if(!FMLLoader.isProduction()) {
+            //====================================
+            //            --ROTATION (DEV)--
+            //====================================
+            float headRotRaw = Mth.rotLerp(partialTicks, entity.yHeadRotO, entity.yHeadRot);
+            float headRot = Mth.wrapDegrees(headRotRaw);
+            float bodyRot = Mth.wrapDegrees(Mth.rotLerp(partialTicks, entity.yBodyRotO, entity.yBodyRot));
+            float headBodyDiff = Mth.wrapDegrees(headRot - bodyRot);
 
 
-        float viewLimit = 50.0F;
-        boolean atLimit = Math.abs(headBodyDiff) >= viewLimit - 1.0F;
+            float viewLimit = 50.0F;
+            boolean atLimit = Math.abs(headBodyDiff) >= viewLimit - 1.0F;
 
-        if(localPlayerPatch.getOriginal().zza < 0.01) {
-            if (atLimit) {
-                if (!wasAtLimit) {
+            if (localPlayerPatch.getOriginal().zza < 0.01) {
+                if (atLimit) {
+                    if (!wasAtLimit) {
+                        prevHeadYaw = headRotRaw;
+                    }
+                    float headDelta = headRotRaw - prevHeadYaw;
+                    accumulatedYawAtLimit += headDelta;
                     prevHeadYaw = headRotRaw;
+                } else {
+                    if (Math.abs(accumulatedYawAtLimit) < 0.1f)
+                        accumulatedYawAtLimit = lastAccumulatedYaw; // hold last value
                 }
-                float headDelta = headRotRaw - prevHeadYaw;
-                accumulatedYawAtLimit += headDelta;
-                prevHeadYaw = headRotRaw;
             } else {
-                if (Math.abs(accumulatedYawAtLimit) < 0.1f)
-                    accumulatedYawAtLimit = lastAccumulatedYaw; // hold last value
+                accumulatedYawAtLimit = headRot;
             }
+
+            // Store last value when leaving limit
+            if (!atLimit && wasAtLimit) {
+                lastAccumulatedYaw = accumulatedYawAtLimit;
+            }
+            wasAtLimit = atLimit;
+
+            poseStack.mulPose(Axis.YP.rotationDegrees(-accumulatedYawAtLimit + 180.0F));
+
+            float xHeadRot = Mth.rotLerp(partialTicks, entity.xRotO, entity.getXRot());
+            float t = (xHeadRot) / 180.0F;
+            float xForMatrix = Mth.lerp(t, 0, 0.0F);
+            poseStack.mulPose(Axis.XP.rotationDegrees(xForMatrix));
+            //-----------------------------------------
         }
-        else{
-            accumulatedYawAtLimit = headRot;
+        else {
+            //====================================
+            //            --ROTATION V1--
+            //====================================
+            float prevYaw = Mth.wrapDegrees(localPlayerPatch.getYRotO() - entity.yHeadRotO);
+            float currYaw = Mth.wrapDegrees(localPlayerPatch.getYRot() - entity.yHeadRot);
+            float yawForMatrix = Mth.rotLerp(partialTicks, prevYaw, currYaw);
+
+            yawForMatrix = -yawForMatrix;
+            float viewLimit = 50;
+            yawForMatrix = Mth.clamp(yawForMatrix, -viewLimit, viewLimit);
+
+            float xHeadRot = Mth.rotLerp(partialTicks, entity.xRotO, entity.getXRot());
+
+            poseStack.mulPose(Axis.XP.rotationDegrees(xHeadRot));
+            poseStack.mulPose(Axis.YP.rotationDegrees(yawForMatrix));
+            //-------------------
         }
-
-        // Store last value when leaving limit
-        if (!atLimit && wasAtLimit) {
-            lastAccumulatedYaw = accumulatedYawAtLimit;
-        }
-        wasAtLimit = atLimit;
-
-        poseStack.mulPose(Axis.YP.rotationDegrees(-accumulatedYawAtLimit + 180.0F));
-
-        float xHeadRot = Mth.rotLerp(partialTicks, entity.xRotO, entity.getXRot());
-        float t = (xHeadRot) / 180.0F;
-        float xForMatrix = Mth.lerp(t, 0, 0.0F);
-        poseStack.mulPose(Axis.XP.rotationDegrees(xForMatrix));
-
-
-        //-----------------------------------------
-
         //--------
         this.prepareVanillaModel(entity, renderer.getModel(), renderer, partialTicks);
         this.setArmaturePose(localPlayerPatch, armature, partialTicks);

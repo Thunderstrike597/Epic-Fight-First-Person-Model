@@ -34,7 +34,9 @@ public interface AccessorWearableItemLayer<E extends LivingEntity, T extends Liv
     @Invoker("renderGlint")
     void invokeRenderGlint(PoseStack poseStack, MultiBufferSource multiBufferSource, int packedLight, SkinnedMesh model, Armature armature, OpenMatrix4f[] poses);
     @Invoker("innerModel")
-    boolean getInnerModel(EquipmentSlot slot);
+    static boolean getInnerModel(EquipmentSlot slot) { // <-- Added 'static'
+        throw new AssertionError();
+    }
     @Invoker("renderTrim")
     void invokeRenderTrim(PoseStack poseStack, MultiBufferSource multiBufferSource, int packedLight, SkinnedMesh model, Armature armature, Holder<ArmorMaterial> armorMaterial, ArmorTrim armorTrim, EquipmentSlot slot, OpenMatrix4f[] poses);
 

@@ -11,9 +11,9 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Invoker;
 import yesman.epicfight.api.client.model.SkinnedMesh;
 
-@Mixin(value = HumanoidArmorLayer.class)
+@Mixin(value = HumanoidArmorLayer.class, remap = false)
 public interface AccessorHumanoidArmorLayer<T extends LivingEntity, M extends HumanoidModel<T>, A extends HumanoidModel<T>>{
 
-    @Invoker("getArmorModel")
+    @Invoker(value = "getArmorModel", remap = false)
     A invokeGetArmorModel(EquipmentSlot slot);
 }

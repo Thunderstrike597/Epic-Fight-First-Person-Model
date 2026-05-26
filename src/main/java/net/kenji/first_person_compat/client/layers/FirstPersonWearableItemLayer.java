@@ -128,7 +128,7 @@ public class FirstPersonWearableItemLayer<E extends LivingEntity, T extends Livi
                         ArmorMaterial armormaterial = (ArmorMaterial)armorItem.getMaterial().value();
                         IClientItemExtensions extensions = IClientItemExtensions.of(itemstack);
                         int fallbackColor = extensions.getDefaultDyeColor(itemstack);
-                        boolean innerModel = ((AccessorWearableItemLayer)this).getInnerModel(slot);
+                        boolean innerModel = AccessorWearableItemLayer.getInnerModel(slot);
 
                         for(int layerIdx = 0; layerIdx < armormaterial.layers().size(); ++layerIdx) {
                             ArmorMaterial.Layer armormaterial$layer = (ArmorMaterial.Layer)armormaterial.layers().get(layerIdx);
