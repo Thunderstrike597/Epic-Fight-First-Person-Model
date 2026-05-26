@@ -2,9 +2,8 @@ package net.kenji.first_person_compat.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
-import net.kenji.first_person_compat.FirstPersonCompat;
+import net.kenji.first_person_compat.FirstPersonModel;
 import net.kenji.first_person_compat.client.layers.FirstPersonWearableItemLayer;
-import net.kenji.first_person_compat.mixins.AccessorHumanoidArmorLayer;
 import net.kenji.first_person_compat.mixins.AccessorLivingEntityRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
@@ -18,8 +17,6 @@ import net.minecraft.client.renderer.entity.layers.*;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.common.MinecraftForge;
@@ -27,38 +24,23 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.jline.utils.Log;
-import org.joml.Matrix4f;
-import org.joml.Quaternionf;
 import org.joml.Vector4f;
-import org.lwjgl.glfw.GLFW;
-import yesman.epicfight.api.animation.JointTransform;
-import yesman.epicfight.api.animation.LivingMotion;
 import yesman.epicfight.api.animation.LivingMotions;
-import yesman.epicfight.api.animation.Pose;
 import yesman.epicfight.api.animation.types.StaticAnimation;
 import yesman.epicfight.api.client.forgeevent.PrepareModelEvent;
 import yesman.epicfight.api.client.model.Meshes;
-import yesman.epicfight.api.client.model.SkinnedMesh;
 import yesman.epicfight.api.model.Armature;
 import yesman.epicfight.api.utils.math.MathUtils;
 import yesman.epicfight.api.utils.math.OpenMatrix4f;
 import yesman.epicfight.api.utils.math.Vec2i;
-import yesman.epicfight.client.ClientEngine;
-import yesman.epicfight.client.events.engine.RenderEngine;
 import yesman.epicfight.client.mesh.HumanoidMesh;
 import yesman.epicfight.client.renderer.FirstPersonRenderer;
-import yesman.epicfight.client.renderer.patched.layer.EmptyLayer;
-import yesman.epicfight.client.renderer.patched.layer.PatchedItemInHandLayer;
 import yesman.epicfight.client.renderer.patched.layer.PatchedLayer;
-import yesman.epicfight.client.renderer.patched.layer.WearableItemLayer;
 import yesman.epicfight.client.world.capabilites.entitypatch.player.LocalPlayerPatch;
 import yesman.epicfight.mixin.client.MixinLivingEntityRenderer;
 import yesman.epicfight.model.armature.HumanoidArmature;
-import yesman.epicfight.world.capabilities.EpicFightCapabilities;
 
 import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 
 public class FirstPersonBodyRenderer extends FirstPersonRenderer {
 
@@ -216,7 +198,7 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
         super.prepareModel(mesh, entity, entitypatch, renderer);
     }
 
-    @Mod.EventBusSubscriber(modid = FirstPersonCompat.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
+    @Mod.EventBusSubscriber(modid = FirstPersonModel.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
     public static class ClientEvents{
         @SubscribeEvent
         public static void onClientTick(TickEvent.ClientTickEvent event) {
