@@ -3,6 +3,7 @@ package net.kenji.first_person_compat.mixins;
 import net.kenji.first_person_compat.client.render.FirstPersonBodyRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.world.entity.EntityType;
+import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,9 +17,8 @@ public class MixinRenderEngine {
     @Shadow
     private FirstPersonRenderer firstPersonRenderer;
 
-    @Inject(method = "reloadEntityRenderers", at = @At("TAIL"))
-    private void replaceFirstPersonRenderer(EntityRendererProvider.Context context, CallbackInfo ci) {
-        // Grab context somehow (store from earlier init) and replace:
-        this.firstPersonRenderer = new FirstPersonBodyRenderer(context, EntityType.PLAYER);
+    @Inject(method = "epicfight$addLayers", at = @At("TAIL"))
+    private void replaceFirstPersonRenderer(EntityRenderersEvent.AddLayers event, CallbackInfo ci) {
+        this.firstPersonRenderer = new FirstPersonBodyRenderer(event.getContext(), EntityType.PLAYER);
     }
 }

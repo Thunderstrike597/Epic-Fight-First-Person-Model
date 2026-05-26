@@ -2,9 +2,7 @@ package net.kenji.first_person_compat.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
-import net.kenji.first_person_compat.FirstPersonCompat;
 import net.kenji.first_person_compat.client.layers.FirstPersonWearableItemLayer;
-import net.kenji.first_person_compat.mixins.AccessorHumanoidArmorLayer;
 import net.kenji.first_person_compat.mixins.AccessorLivingEntityRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
@@ -18,56 +16,42 @@ import net.minecraft.client.renderer.entity.layers.*;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.InputEvent;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+
+import net.minecraft.world.entity.ai.control.BodyRotationControl;
 import org.jline.utils.Log;
 import org.joml.Matrix4f;
-import org.joml.Quaternionf;
 import org.joml.Vector4f;
-import org.lwjgl.glfw.GLFW;
-import yesman.epicfight.api.animation.JointTransform;
-import yesman.epicfight.api.animation.LivingMotion;
 import yesman.epicfight.api.animation.LivingMotions;
-import yesman.epicfight.api.animation.Pose;
 import yesman.epicfight.api.animation.types.StaticAnimation;
-import yesman.epicfight.api.client.forgeevent.PrepareModelEvent;
+import yesman.epicfight.api.client.camera.EpicFightCameraAPI;
+import yesman.epicfight.api.client.event.EpicFightClientEventHooks;
+import yesman.epicfight.api.client.event.types.render.PrepareModelEvent;
 import yesman.epicfight.api.client.model.Meshes;
-import yesman.epicfight.api.client.model.SkinnedMesh;
 import yesman.epicfight.api.model.Armature;
 import yesman.epicfight.api.utils.math.MathUtils;
 import yesman.epicfight.api.utils.math.OpenMatrix4f;
 import yesman.epicfight.api.utils.math.Vec2i;
-import yesman.epicfight.client.ClientEngine;
-import yesman.epicfight.client.events.engine.RenderEngine;
 import yesman.epicfight.client.mesh.HumanoidMesh;
 import yesman.epicfight.client.renderer.FirstPersonRenderer;
-import yesman.epicfight.client.renderer.patched.layer.EmptyLayer;
-import yesman.epicfight.client.renderer.patched.layer.PatchedItemInHandLayer;
 import yesman.epicfight.client.renderer.patched.layer.PatchedLayer;
-import yesman.epicfight.client.renderer.patched.layer.WearableItemLayer;
 import yesman.epicfight.client.world.capabilites.entitypatch.player.LocalPlayerPatch;
 import yesman.epicfight.mixin.client.MixinLivingEntityRenderer;
 import yesman.epicfight.model.armature.HumanoidArmature;
-import yesman.epicfight.world.capabilities.EpicFightCapabilities;
 
 import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 
 public class FirstPersonBodyRenderer extends FirstPersonRenderer {
 
+    // Track accumulated rotation at the limit
+    private float accumulatedYawAtLimit = 0f;
+    private float prevHeadYaw = 0f;
+    private float lastAccumulatedYaw;
+    private boolean wasAtLimit = false;
     private float offsetTimer = 0f;
 
     public FirstPersonBodyRenderer(EntityRendererProvider.Context context, EntityType<?> entityType) {
         super(context, entityType);
         this.addPatchedLayerAlways(HumanoidArmorLayer.class, new FirstPersonWearableItemLayer<>(Meshes.BIPED, context.getModelManager()));
-
     }
 
     @Override
@@ -94,18 +78,46 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
         //====================================
         //            --ROTATION--
         //====================================
-        float prevYaw = Mth.wrapDegrees(localPlayerPatch.getYRotO() - entity.yHeadRotO);
-        float currYaw = Mth.wrapDegrees(localPlayerPatch.getYRot() - entity.yHeadRot);
-        float yawForMatrix = Mth.rotLerp(partialTicks, prevYaw, currYaw);
+        float headRotRaw = Mth.rotLerp(partialTicks, entity.yHeadRotO, entity.yHeadRot);
+        float headRot = Mth.wrapDegrees(headRotRaw);
+        float bodyRot = Mth.wrapDegrees(Mth.rotLerp(partialTicks, entity.yBodyRotO, entity.yBodyRot));
+        float headBodyDiff = Mth.wrapDegrees(headRot - bodyRot);
 
-        yawForMatrix = -yawForMatrix;
-        float viewLimit = 50;
-        yawForMatrix = Mth.clamp(yawForMatrix, -viewLimit, viewLimit);
+
+        float viewLimit = 50.0F;
+        boolean atLimit = Math.abs(headBodyDiff) >= viewLimit - 1.0F;
+
+        if(localPlayerPatch.getOriginal().zza < 0.01) {
+            if (atLimit) {
+                if (!wasAtLimit) {
+                    prevHeadYaw = headRotRaw;
+                }
+                float headDelta = headRotRaw - prevHeadYaw;
+                accumulatedYawAtLimit += headDelta;
+                prevHeadYaw = headRotRaw;
+            } else {
+                if (Math.abs(accumulatedYawAtLimit) < 0.1f)
+                    accumulatedYawAtLimit = lastAccumulatedYaw; // hold last value
+            }
+        }
+        else{
+            accumulatedYawAtLimit = headRot;
+        }
+
+        // Store last value when leaving limit
+        if (!atLimit && wasAtLimit) {
+            lastAccumulatedYaw = accumulatedYawAtLimit;
+        }
+        wasAtLimit = atLimit;
+
+        poseStack.mulPose(Axis.YP.rotationDegrees(-accumulatedYawAtLimit + 180.0F));
 
         float xHeadRot = Mth.rotLerp(partialTicks, entity.xRotO, entity.getXRot());
+        float t = (xHeadRot + 40.0F) / 180.0F;
+        float xForMatrix = Mth.lerp(t, -40.0F, 0.0F);
+        poseStack.mulPose(Axis.XP.rotationDegrees(xForMatrix));
 
-        poseStack.mulPose(Axis.XP.rotationDegrees(xHeadRot));
-        poseStack.mulPose(Axis.YP.rotationDegrees(yawForMatrix));
+
         //-----------------------------------------
 
         //--------
@@ -127,7 +139,7 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
         float headZ = headPoseMatrix.m32;
         float finalMovement = localPlayerPatch.getOriginal().zza + localPlayerPatch.getOriginal().xxa;
         StaticAnimation walkAnim = localPlayerPatch.getClientAnimator().getLivingMotion(LivingMotions.WALK).get();
-        float deltaTime = Minecraft.getInstance().getDeltaFrameTime();
+        float deltaTime = Minecraft.getInstance().getTimer().getGameTimeDeltaTicks();
         float smoothingAmount = 0.7F;
         float finalOffset = 0.12F;
         if(finalMovement == 0 || (walkAnim != null && walkAnim.getPlaySpeed(localPlayerPatch, walkAnim.getAccessor().get()) < 0.05F)) {
@@ -146,7 +158,7 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
             HumanoidMesh mesh = (HumanoidMesh) this.getMeshProvider(localPlayerPatch).get();
             this.prepareModel(mesh, entity, localPlayerPatch, renderer);
             PrepareModelEvent prepareModelEvent = new PrepareModelEvent(this, mesh, localPlayerPatch, buffer, poseStack, packedLight, partialTicks);
-            if (!MinecraftForge.EVENT_BUS.post(prepareModelEvent)) {
+            if (!((PrepareModelEvent) EpicFightClientEventHooks.Render.PREPARE_MODEL_TO_RENDER.post(prepareModelEvent)).isCanceled()) {
                 Vector4f color = new Vector4f(1.0F, 1.0F, 1.0F, isVisibleToPlayer ? 0.15F : 1.0F);
                 localPlayerPatch.getEntityDecorations().modifyColor(color, partialTicks);
                 int blockLight = (packedLight & 240) >> 4;
@@ -154,15 +166,13 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
                 Vec2i lightUv = new Vec2i(blockLight, skyLight);
                 localPlayerPatch.getEntityDecorations().modifyLight(lightUv, partialTicks);
                 int modifiedLight = LightTexture.pack(lightUv.x, lightUv.y);
-                mesh.draw(poseStack, buffer, renderType, modifiedLight, color.x(), color.y(), color.z(), color.w(),
-                        this.getOverlayCoord(entity, localPlayerPatch, partialTicks), armature, armature.getPoseMatrices());
+                mesh.draw(poseStack, buffer, renderType, modifiedLight, color.x(), color.y(), color.z(), color.w(), this.getOverlayCoord(entity, localPlayerPatch, partialTicks), armature, armature.getPoseMatrices());
                 localPlayerPatch.getEntityDecorations().listDecorationOverlays().forEach((decorationOverlay) -> {
-                    if (!decorationOverlay.shouldRemove() && decorationOverlay.shouldRender()) {
+                    if (decorationOverlay.shouldRender()) {
                         Vector4f overlayColor = decorationOverlay.color(partialTicks);
-                        mesh.draw(poseStack, buffer, decorationOverlay.getRenderType(), modifiedLight,
-                                overlayColor.x(), overlayColor.y(), overlayColor.z(), overlayColor.w(),
-                                OverlayTexture.NO_OVERLAY, armature, armature.getPoseMatrices());
+                        mesh.draw(poseStack, buffer, decorationOverlay.getRenderType(), modifiedLight, overlayColor.x(), overlayColor.y(), overlayColor.z(), overlayColor.w(), OverlayTexture.NO_OVERLAY, armature, armature.getPoseMatrices());
                     }
+
                 });
             }
         }
@@ -216,15 +226,4 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
         super.prepareModel(mesh, entity, entitypatch, renderer);
     }
 
-    @Mod.EventBusSubscriber(modid = FirstPersonCompat.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
-    public static class ClientEvents{
-        @SubscribeEvent
-        public static void onClientTick(TickEvent.ClientTickEvent event) {
-            if (event.phase != TickEvent.Phase.END) return;
-        }
-        @SubscribeEvent
-        public static void onKeyInput(InputEvent.Key event){
-
-        }
-    }
 }

@@ -1,24 +1,9 @@
-buildscript {
-    repositories {
-        // These repositories are only for Gradle plugins, put any other repositories in the repository block further below
-        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
-    }
-}
-
-
 plugins {
     id 'eclipse'
     id 'idea'
     id 'maven-publish'
-    id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
-    id 'org.parchmentmc.librarian.forgegradle' version '1.+'
+    id 'net.neoforged.gradle.userdev' version '7.0.192'
 }
-
-apply plugin: 'org.spongepowered.mixin'
 
 group = mod_group_id
 version = mod_version
@@ -28,114 +13,48 @@ base {
 }
 
 java {
-    toolchain.languageVersion = JavaLanguageVersion.of(17)
+    toolchain.languageVersion = JavaLanguageVersion.of(language_version)
 }
 
-minecraft {
-    // The mappings can be changed at any time and must be in the following format.
-    // Channel:   Version:
-    // official   MCVersion             Official field/method names from Mojang mapping files
-    // parchment  YYYY.MM.DD-MCVersion  Open community-sourced parameter names and javadocs layered on top of official
-    //
-    // You must be aware of the Mojang license when using the 'official' or 'parchment' mappings.
-    // See more information here: https://github.com/MinecraftForge/MCPConfig/blob/master/Mojang.md
-    //
-    // Parchment is an unofficial project maintained by ParchmentMC, separate from MinecraftForge
-    // Additional setup is needed to use their mappings: https://parchmentmc.org/docs/getting-started
-    //
-    // Use non-default mappings at your own risk. They may not always work.
-    // Simply re-run your setup task after changing the mappings to update your workspace.
-    mappings channel: mapping_channel, version: mapping_version
+// -------------------- Runs --------------------
+runs {
+    configureEach {
+        workingDirectory project.file("run")
+        modSource sourceSets.main
 
-    // When true, this property will have all Eclipse/IntelliJ IDEA run configurations run the "prepareX" task for the given run configuration before launching the game.
-    // In most cases, it is not necessary to enable.
-    // enableEclipsePrepareRuns = true
-    // enableIdeaPrepareRuns = true
+        systemProperties 'forge.logging.markers': 'REGISTRIES',
+                'forge.logging.console.level': 'debug'
+    }
 
-    // This property allows configuring Gradle's ProcessResources task(s) to run on IDE output locations before launching the game.
-    // It is REQUIRED to be set to true for this template to function.
-    // See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
-    copyIdeResources = true
+    client {
+        systemProperty 'forge.enabledGameTestNamespaces', mod_id
+    }
 
-    // When true, this property will add the folder name of all declared run configurations to generated IDE run configurations.
-    // The folder name can be set on a run configuration using the "folderName" property.
-    // By default, the folder name of a run configuration is the name of the Gradle project containing it.
-    // generateRunFolders = true
+    server {
+        systemProperty 'forge.enabledGameTestNamespaces', mod_id
+        systemProperty 'forge.forcePacketLimit', '33554432'
+        programArgument '--nogui'
+    }
 
-    // This property enables access transformers for use in development.
-    // They will be applied to the Minecraft artifact.
-    // The access transformer file can be anywhere in the project.
-    // However, it must be at "META-INF/accesstransformer.cfg" in the final mod jar to be loaded by Forge.
-    // This default location is a best practice to automatically put the file in the right place in the final jar.
-    // See https://docs.minecraftforge.net/en/latest/advanced/accesstransformers/ for more information.
-    // accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+    gameTestServer {
+        systemProperty 'forge.enabledGameTestNamespaces', mod_id
+    }
 
-    // Default run configurations.
-    // These can be tweaked, removed, or duplicated as needed.
-    runs {
-        // applies to all the run configs below
-        configureEach {
-            workingDirectory file("${projectDir}/run")
-
-            // Recommended logging data for a userdev environment
-            // The markers can be added/remove as needed separated by commas.
-            // "SCAN": For mods scan.
-            // "REGISTRIES": For firing of registry events.
-            // "REGISTRYDUMP": For getting the contents of all registries.
-            property 'forge.logging.markers', 'REGISTRIES'
-
-
-            // Recommended logging level for the console
-            // You can set various levels here.
-            // Please read: https://stackoverflow.com/questions/2031163/when-to-use-the-different-log-levels
-            property 'forge.logging.console.level', 'debug'
-
-            mods {
-                "${mod_id}" {
-                    source sourceSets.main
-                }
-            }
-        }
-
-        client {
-            // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
-            property 'forge.enabledGameTestNamespaces', mod_id
-        }
-
-        server {
-            property 'forge.enabledGameTestNamespaces', mod_id
-            property 'forge.forcePacketLimit', '33554432'
-            args '--nogui'
-        }
-
-        // This run config launches GameTestServer and runs all registered gametests, then exits.
-        // By default, the server will crash when no gametests are provided.
-        // The gametest system is also enabled by default for other run configs under the /test command.
-        gameTestServer {
-            property 'forge.enabledGameTestNamespaces', mod_id
-        }
-
-        data {
-            // example of overriding the workingDirectory set in configureEach above
-            workingDirectory project.file('run-data')
-            tasks.withType(ProcessResources).configureEach {
-                duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-            }
-            // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
-            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
-        }
+    data {
+        workingDirectory project.file('run-data')
+        programArguments.addAll '--mod', mod_id, '--all',
+                '--output', file('src/generated/resources/').absolutePath,
+                '--existing', file('src/main/resources/').absolutePath
     }
 }
 
-mixin {
-    add sourceSets.main, "${mod_id}.refmap.json"
+// -------------------- Mixin --------------------
 
-    config "${mod_id}.mixins.json"
-}
 
-// Include resources generated by data generators.
+// -------------------- Sources --------------------
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
+// -------------------- Repositories --------------------
 repositories {
     mavenLocal()
     maven {
@@ -165,50 +84,47 @@ repositories {
     }
 }
 
+// -------------------- Dependencies --------------------
 dependencies {
-    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    implementation "net.neoforged:neoforge:${neoforge_version}"
 
+    // Mixin annotation processor — still needed explicitly
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 
-    implementation fg.deobf("curse.maven:embeddium-908741:5681725")
+    implementation "curse.maven:embeddium-908741:6118392"
+    implementation "curse.maven:epic-fight-mod-405076:7956628"
 
-    //implementation fg.deobf("curse.maven:oculus-581495:6020952")
-    implementation fg.deobf("curse.maven:epic-fight-mod-405076:7734075")
+    // JEI
+    implementation "curse.maven:jei-238222:7420587"
+    implementation "curse.maven:just-enough-resources-jer-240630:6174588"
 
-    implementation fg.deobf("curse.maven:jei-238222:5533463")
-    implementation fg.deobf("curse.maven:just-enough-resources-jer-240630:5057220")
-    implementation fg.deobf("curse.maven:patchouli-306770:4966125")
-
-    compileOnly(fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}"))
-    compileOnly(fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}"))
-    runtimeOnly(fg.deobf("mezz.jei:jei-${minecraft_version}-forge:${jei_version}"))
-
+    compileOnly "mezz.jei:jei-${minecraft_version}-common-api:${jei_version}"
+    compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"
+    runtimeOnly "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
 }
 
 // -------------------- Resources --------------------
 tasks.named('processResources', ProcessResources).configure {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
     var replaceProperties = [
-            minecraft_version   : minecraft_version,
+            minecraft_version      : minecraft_version,
             minecraft_version_range: minecraft_version_range,
-            forge_version       : forge_version,
-            forge_version_range : forge_version_range,
-            loader_version_range: loader_version_range,
-            mod_id              : mod_id,
-            mod_name            : mod_name,
-            mod_license         : mod_license,
-            mod_version         : mod_version,
-            mod_authors         : mod_authors,
-            mod_description     : mod_description
+            neoforge_version       : neoforge_version,
+            neoforge_version_range : neoforge_version_range,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            mod_authors            : mod_authors,
+            mod_description        : mod_description
     ]
 
     inputs.properties replaceProperties
 
-    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+    filesMatching(['META-INF/neoforge.mods.toml', 'pack.mcmeta']) {
         expand replaceProperties + [project: project]
-    }
-    from("$buildDir/tmp/compileJava/compileJava-refmap.json") {
-        rename { "${mod_id}.refmap.json" }
     }
 }
 
@@ -217,9 +133,9 @@ java {
     withSourcesJar()
 }
 
-// -------------------- Dev Jar (DEOBF) --------------------
+// -------------------- Jar --------------------
 tasks.named('jar', Jar).configure {
-    archiveBaseName = "EpicFight-FirstPerson-Forge-EFM-${epic_fight_version}"
+    archiveBaseName = "EpicFightFirstPerson-NeoForge-EFM-${epic_fight_version}"
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     manifest {
         attributes([
@@ -229,30 +145,13 @@ tasks.named('jar', Jar).configure {
                 "Implementation-Title"    : project.name,
                 "Implementation-Version"  : project.version,
                 "Implementation-Vendor"   : mod_authors,
-                "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+                "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+                "MixinConfigs"            : "${mod_id}.mixins.json"  // ADD THIS
         ])
     }
 }
 
-// -------------------- Forge Reobf Wiring --------------------
-// Tell ForgeGradle WHICH jar to reobfuscate
-reobf {
-    jar {}
-}
-
-// Build should ALSO produce a reobf jar
-tasks.named('build') {
-    dependsOn 'reobfJar'
-}
-
-// -------------------- Explicit Production Task --------------------
-tasks.register('releaseJar') {
-    group = 'build'
-    description = 'Build reobfuscated production jar'
-    dependsOn 'jar', 'reobfJar'
-}
-
-// -------------------- Publishing (DEV ONLY) --------------------
+// -------------------- Publishing --------------------
 publishing {
     publications {
         mavenJava(MavenPublication) {
@@ -273,6 +172,7 @@ publishing {
         mavenLocal()
     }
 }
+
 tasks.withType(GenerateModuleMetadata).configureEach {
     enabled = false
 }

@@ -9,17 +9,24 @@ import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
 import net.minecraft.client.resources.model.ModelManager;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.DyeableLeatherItem;
+import net.minecraft.world.item.ArmorMaterial;
+
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.armortrim.ArmorTrim;
-import net.minecraftforge.client.ForgeHooksClient;
+import net.neoforged.neoforge.client.ClientHooks;
+import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import org.jline.utils.Log;
+import org.joml.Vector4f;
 import yesman.epicfight.api.asset.AssetAccessor;
 import yesman.epicfight.api.client.model.SkinnedMesh;
+import yesman.epicfight.api.utils.ColorUtil;
+import yesman.epicfight.api.utils.ParseUtil;
 import yesman.epicfight.api.utils.math.OpenMatrix4f;
 import yesman.epicfight.client.mesh.HumanoidMesh;
 import yesman.epicfight.client.renderer.patched.layer.WearableItemLayer;
@@ -34,23 +41,19 @@ public class FirstPersonWearableItemLayer<E extends LivingEntity, T extends Livi
     }
 
     @Override
-    public void renderLayer(T entitypatch, E entityliving, HumanoidArmorLayer<E, M, M> vanillaLayer,
-                            PoseStack poseStack, MultiBufferSource buf, int packedLight, OpenMatrix4f[] poses,
-                            float bob, float yRot, float xRot, float partialTicks) {
-
+    public void renderLayer(T entitypatch, E livingentity, HumanoidArmorLayer<E, M, M> vanillaLayer, PoseStack poseStack, MultiBufferSource buffers, int packedLight, OpenMatrix4f[] poses, float bob, float yRot, float xRot, float partialTicks) {
         for(EquipmentSlot slot : EquipmentSlot.values()) {
-            if (slot.getType() == EquipmentSlot.Type.ARMOR) {
+            if (slot.getType() == EquipmentSlot.Type.HUMANOID_ARMOR) {
                 boolean firstPersonChest = false;
                 if (entitypatch.isFirstPerson() && ((AccessorWearableItemLayer)this).getIsFirstPerson()) {
                     if (slot != EquipmentSlot.CHEST) {
                         continue;
                     }
-
                     firstPersonChest = true;
                 }
 
                 if (slot != EquipmentSlot.HEAD || !Minecraft.getInstance().options.getCameraType().isFirstPerson()) {
-                    ItemStack itemstack = entityliving.getItemBySlot(slot);
+                    ItemStack itemstack = livingentity.getItemBySlot(slot);
                     Item item = itemstack.getItem();
                     if (item instanceof ArmorItem) {
                         ArmorItem armorItem = (ArmorItem)item;
@@ -64,9 +67,9 @@ public class FirstPersonWearableItemLayer<E extends LivingEntity, T extends Livi
                             poseStack.translate((double)0.0F, (double)head * 0.055, (double)0.0F);
                         }
 
-                        HumanoidModel defaultModel = ((AccessorHumanoidArmorLayer)vanillaLayer).invokeGetArmorModel(slot);
-                        Model armorModel = ForgeHooksClient.getArmorModel(entityliving, itemstack, slot, defaultModel);
-                        SkinnedMesh armorMesh = ((AccessorWearableItemLayer)this).invokeGetArmorModel(vanillaLayer, defaultModel, armorModel, entityliving, armorItem, itemstack, slot);
+                        HumanoidModel vanillaModel = ((AccessorHumanoidArmorLayer)vanillaLayer).invokeGetArmorModel(slot);
+                        Model armorModel = ClientHooks.getArmorModel(livingentity, itemstack, slot, vanillaModel);
+                        SkinnedMesh armorMesh = ((AccessorWearableItemLayer)this).invokeGetArmorModel(vanillaLayer, vanillaModel, armorModel, livingentity, armorItem, itemstack, slot);
                         if (armorMesh == null) {
                             poseStack.popPose();
                             return;
@@ -74,13 +77,13 @@ public class FirstPersonWearableItemLayer<E extends LivingEntity, T extends Livi
 
                         if (armorModel instanceof HumanoidModel) {
                             HumanoidModel humanoidModel = (HumanoidModel)armorModel;
-                            boolean shouldSit = entityliving.isPassenger() && entityliving.getVehicle() != null && entityliving.getVehicle().shouldRiderSit();
+                            boolean shouldSit = livingentity.isPassenger() && livingentity.getVehicle() != null && livingentity.getVehicle().shouldRiderSit();
                             float f8 = 0.0F;
                             float f5 = 0.0F;
-                            if (!shouldSit && entityliving.isAlive()) {
-                                f8 = entityliving.walkAnimation.speed(partialTicks);
-                                f5 = entityliving.walkAnimation.position(partialTicks);
-                                if (entityliving.isBaby()) {
+                            if (!shouldSit && livingentity.isAlive()) {
+                                f8 = livingentity.walkAnimation.speed(partialTicks);
+                                f5 = livingentity.walkAnimation.position(partialTicks);
+                                if (livingentity.isBaby()) {
                                     f5 *= 3.0F;
                                 }
 
@@ -90,8 +93,8 @@ public class FirstPersonWearableItemLayer<E extends LivingEntity, T extends Livi
                             }
 
                             try {
-                                humanoidModel.setupAnim(entityliving, f8, f5, bob, yRot, xRot);
-                            } catch (ClassCastException var29) {
+                                humanoidModel.setupAnim(livingentity, f8, f5, bob, yRot, xRot);
+                            } catch (ClassCastException var33) {
                             }
 
                             humanoidModel.head.loadPose(humanoidModel.head.getInitialPose());
@@ -122,21 +125,28 @@ public class FirstPersonWearableItemLayer<E extends LivingEntity, T extends Livi
                             });
                         }
 
-                        if (armorItem instanceof DyeableLeatherItem) {
-                            DyeableLeatherItem dyeableItem = (DyeableLeatherItem)armorItem;
-                            int i = dyeableItem.getColor(itemstack);
-                            float r = (float)(i >> 16 & 255) / 255.0F;
-                            float g = (float)(i >> 8 & 255) / 255.0F;
-                            float b = (float)(i & 255) / 255.0F;
-                            ((AccessorWearableItemLayer)this).invokeRenderArmor(poseStack, buf, packedLight, armorMesh, entitypatch.getArmature(), r, g, b, ((AccessorWearableItemLayer)this).invokeGetArmorTexture(itemstack, entityliving, armorMesh, slot, (String)null, defaultModel), poses);
-                            ((AccessorWearableItemLayer)this).invokeRenderArmor(poseStack, buf, packedLight, armorMesh, entitypatch.getArmature(), 1.0F, 1.0F, 1.0F, ((AccessorWearableItemLayer)this).invokeGetArmorTexture(itemstack, entityliving, armorMesh, slot, "overlay", defaultModel), poses);
-                        } else {
-                            ((AccessorWearableItemLayer)this).invokeRenderArmor(poseStack, buf, packedLight, armorMesh, entitypatch.getArmature(), 1.0F, 1.0F, 1.0F, ((AccessorWearableItemLayer)this).invokeGetArmorTexture(itemstack, entityliving, armorMesh, slot, (String)null, defaultModel), poses);
+                        ArmorMaterial armormaterial = (ArmorMaterial)armorItem.getMaterial().value();
+                        IClientItemExtensions extensions = IClientItemExtensions.of(itemstack);
+                        int fallbackColor = extensions.getDefaultDyeColor(itemstack);
+                        boolean innerModel = ((AccessorWearableItemLayer)this).getInnerModel(slot);
+
+                        for(int layerIdx = 0; layerIdx < armormaterial.layers().size(); ++layerIdx) {
+                            ArmorMaterial.Layer armormaterial$layer = (ArmorMaterial.Layer)armormaterial.layers().get(layerIdx);
+                            int packedColor = extensions.getArmorLayerTintColor(itemstack, livingentity, armormaterial$layer, layerIdx, fallbackColor);
+                            if (packedColor != 0) {
+                                Vector4f color = ColorUtil.unpackToARGBF(packedColor);
+                                ResourceLocation texture = (ResourceLocation) ParseUtil.tryGetOr(() -> armorMesh.getRenderProperties().customTexturePath(), () -> ClientHooks.getArmorTexture(livingentity, itemstack, armormaterial$layer, innerModel, slot));
+                                ((AccessorWearableItemLayer)this).invokeRenderArmor(poseStack, buffers, packedLight, armorMesh, entitypatch.getArmature(), color.x, color.y, color.z, texture, poses);
+                            }
                         }
 
-                        ArmorTrim.getTrim(entityliving.level().registryAccess(), itemstack).ifPresent((armorTrim) -> ((AccessorWearableItemLayer)this).invokeRenderTrim(poseStack, buf, packedLight, armorMesh, entitypatch.getArmature(), armorItem.getMaterial(), armorTrim, slot, poses));
+                        ArmorTrim armorTrim = (ArmorTrim)itemstack.get(DataComponents.TRIM);
+                        if (armorTrim != null) {
+                            ((AccessorWearableItemLayer)this).invokeRenderTrim(poseStack, buffers, packedLight, armorMesh, entitypatch.getArmature(), armorItem.getMaterial(), armorTrim, slot, poses);
+                        }
+
                         if (itemstack.hasFoil()) {
-                            ((AccessorWearableItemLayer)this).invokeRenderGlint(poseStack, buf, packedLight, armorMesh, entitypatch.getArmature(), poses);
+                            ((AccessorWearableItemLayer)this).invokeRenderGlint(poseStack, buffers, packedLight, armorMesh, entitypatch.getArmature(), poses);
                         }
 
                         poseStack.popPose();
@@ -144,5 +154,6 @@ public class FirstPersonWearableItemLayer<E extends LivingEntity, T extends Livi
                 }
             }
         }
+
     }
 }

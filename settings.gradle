@@ -8,6 +8,10 @@ pluginManagement {
         maven {
             url = 'https://maven.parchmentmc.org'
         }
+
+        maven {
+            url = 'https://maven.neoforged.net/releases'
+        }
     }
 }
 
@@ -15,4 +19,4 @@ plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '0.7.0'
 }
 
-rootProject.name = 'epic-fight-first-person-compat'
+rootProject.name = 'epic-fight-first-person-neoforge-1_21_1'
