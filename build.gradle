@@ -179,6 +179,9 @@ dependencies {
     implementation fg.deobf("curse.maven:just-enough-resources-jer-240630:5057220")
     implementation fg.deobf("curse.maven:patchouli-306770:4966125")
 
+    implementation fg.deobf("curse.maven:armourers-workshop-229523:7165521")
+    implementation fg.deobf("curse.maven:cosmetic-armor-reworked-237307:4600191")
+
     compileOnly(fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}"))
     compileOnly(fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}"))
     runtimeOnly(fg.deobf("mezz.jei:jei-${minecraft_version}-forge:${jei_version}"))

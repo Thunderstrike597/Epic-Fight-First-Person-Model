@@ -1,6 +1,7 @@
 package net.kenji.first_person_compat.client.layers;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.kenji.first_person_compat.client.compat.CosmeticArmorCompat;
 import net.kenji.first_person_compat.mixins.AccessorHumanoidArmorLayer;
 import net.kenji.first_person_compat.mixins.AccessorWearableItemLayer;
 import net.minecraft.client.Minecraft;
@@ -17,6 +18,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.armortrim.ArmorTrim;
 import net.minecraftforge.client.ForgeHooksClient;
+import net.minecraftforge.fml.ModList;
 import org.jline.utils.Log;
 import yesman.epicfight.api.asset.AssetAccessor;
 import yesman.epicfight.api.client.model.SkinnedMesh;
@@ -32,6 +34,7 @@ public class FirstPersonWearableItemLayer<E extends LivingEntity, T extends Livi
     public FirstPersonWearableItemLayer(AssetAccessor<AM> meshProvider, ModelManager modelManager) {
         super(meshProvider, false, modelManager); // always false — we handle full body
     }
+    private static final boolean CAR_LOADED = ModList.get().isLoaded("cosmeticarmorreworked");
 
     @Override
     public void renderLayer(T entitypatch, E entityliving, HumanoidArmorLayer<E, M, M> vanillaLayer,
@@ -51,7 +54,9 @@ public class FirstPersonWearableItemLayer<E extends LivingEntity, T extends Livi
 
                 if (slot != EquipmentSlot.HEAD || !Minecraft.getInstance().options.getCameraType().isFirstPerson()) {
                     ItemStack itemstack = entityliving.getItemBySlot(slot);
-                    Item item = itemstack.getItem();
+                    if (CAR_LOADED) {
+                        itemstack = CosmeticArmorCompat.getVisibleArmor(entityliving, slot, itemstack);
+                    }                    Item item = itemstack.getItem();
                     if (item instanceof ArmorItem) {
                         ArmorItem armorItem = (ArmorItem)item;
                         if (slot != armorItem.getEquipmentSlot()) {

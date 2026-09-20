@@ -3,6 +3,7 @@ package net.kenji.first_person_compat.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.kenji.first_person_compat.FirstPersonModel;
+import net.kenji.first_person_compat.client.compat.AWCompat;
 import net.kenji.first_person_compat.client.layers.FirstPersonWearableItemLayer;
 import net.kenji.first_person_compat.mixins.AccessorLivingEntityRenderer;
 import net.minecraft.client.Minecraft;
@@ -22,6 +23,7 @@ import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 import org.jline.utils.Log;
 import org.joml.Vector4f;
@@ -43,13 +45,16 @@ import yesman.epicfight.model.armature.HumanoidArmature;
 import java.util.Iterator;
 
 public class FirstPersonBodyRenderer extends FirstPersonRenderer {
+    private static final boolean AW_LOADED = ModList.get().isLoaded("armourers_workshop"); // verify this modid against AW's mods.toml
 
     private float offsetTimer = 0f;
 
     public FirstPersonBodyRenderer(EntityRendererProvider.Context context, EntityType<?> entityType) {
         super(context, entityType);
         this.addPatchedLayerAlways(HumanoidArmorLayer.class, new FirstPersonWearableItemLayer<>(Meshes.BIPED, context.getModelManager()));
-
+        if (AW_LOADED) {
+            AWCompat.registerWardrobeLayer(this);
+        }
     }
 
     @Override
@@ -60,6 +65,9 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
         if (!Minecraft.getInstance().options.getCameraType().isFirstPerson()) {
             super.render(entity, localPlayerPatch, renderer, buffer, poseStack, packedLight, partialTicks);
             return;
+        }
+        if (AW_LOADED) {
+            AWCompat.onRenderPre(entity, packedLight, partialTicks, poseStack, buffer, renderer);
         }
         //super.render(entity, localPlayerPatch, renderer, buffer, poseStack, packedLight, partialTicks);
         Minecraft mc = Minecraft.getInstance();
@@ -136,8 +144,14 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
                 Vec2i lightUv = new Vec2i(blockLight, skyLight);
                 localPlayerPatch.getEntityDecorations().modifyLight(lightUv, partialTicks);
                 int modifiedLight = LightTexture.pack(lightUv.x, lightUv.y);
+
+                OpenMatrix4f[] drawPoses = armature.getPoseMatrices();
+                if (AW_LOADED) {
+
+                    drawPoses = AWCompat.onRenderEntity(entity, armature, modifiedLight, partialTicks, poseStack, buffer, drawPoses);
+                }
                 mesh.draw(poseStack, buffer, renderType, modifiedLight, color.x(), color.y(), color.z(), color.w(),
-                        this.getOverlayCoord(entity, localPlayerPatch, partialTicks), armature, armature.getPoseMatrices());
+                        this.getOverlayCoord(entity, localPlayerPatch, partialTicks), armature, drawPoses);
                 localPlayerPatch.getEntityDecorations().listDecorationOverlays().forEach((decorationOverlay) -> {
                     if (!decorationOverlay.shouldRemove() && decorationOverlay.shouldRender()) {
                         Vector4f overlayColor = decorationOverlay.color(partialTicks);
@@ -153,7 +167,9 @@ public class FirstPersonBodyRenderer extends FirstPersonRenderer {
 
             this.renderLayer(renderer, localPlayerPatch, entity, armature.getPoseMatrices(), buffer, poseStack, packedLight, partialTicks);
         }
-
+        if (AW_LOADED) {
+            AWCompat.onRenderPost(entity, packedLight, partialTicks, poseStack, buffer, renderer);
+        }
         if (renderType != null && Minecraft.getInstance().getEntityRenderDispatcher().shouldRenderHitBoxes()) {
             localPlayerPatch.getClientAnimator().renderDebuggingInfoForAllLayers(poseStack, buffer, partialTicks);
         }
